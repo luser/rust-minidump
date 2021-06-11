@@ -30,6 +30,7 @@ gimli = "0.24"
 log = "0.4"
 memmap = "0.7.0"
 minidump = { version = "0.3.0", path = "../minidump" }
+num-traits = "0.2"
 object = "0.24"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

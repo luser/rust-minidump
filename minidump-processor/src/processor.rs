@@ -8,6 +8,7 @@ use std::ops::Deref;
 
 use minidump::{self, *};
 
+use crate::exploitability;
 use crate::process_state::{CallStack, CallStackInfo, ProcessState};
 use crate::stackwalker;
 use crate::symbols::*;
@@ -122,15 +123,17 @@ where
     // Get exception info if it exists.
     let exception_stream = dump.get_stream::<MinidumpException>().ok();
     let exception_ref = exception_stream.as_ref();
-    let (crash_reason, crash_address, crashing_thread_id) = if let Some(exception) = exception_ref {
-        (
-            Some(exception.get_crash_reason(system_info.os, system_info.cpu)),
-            Some(exception.get_crash_address(system_info.os)),
-            Some(exception.get_crashing_thread_id()),
-        )
-    } else {
-        (None, None, None)
-    };
+    let (crash_reason, crash_address, crashing_thread_id, exception_code) =
+        if let Some(exception) = exception_ref {
+            (
+                Some(exception.get_crash_reason(system_info.os, system_info.cpu)),
+                Some(exception.get_crash_address(system_info.os)),
+                Some(exception.get_crashing_thread_id()),
+                Some(exception.raw.exception_record.exception_code),
+            )
+        } else {
+            (None, None, None, None)
+        };
     let exception_context = exception_ref.and_then(|e| e.context.as_ref());
     // Get assertion
     let assertion = None;
@@ -192,12 +195,12 @@ where
     let unknown_streams = dump.unknown_streams().collect();
     let unimplemented_streams = dump.unimplemented_streams().collect();
 
-    // if exploitability enabled, run exploitability analysis
-    Ok(ProcessState {
+    let mut process_state = ProcessState {
         process_id,
         time: Utc.timestamp(dump.header.time_date_stamp as i64, 0),
         process_create_time,
         crash_reason,
+        exception_code,
         crash_address,
         assertion,
         requesting_thread,
@@ -209,5 +212,11 @@ where
         unloaded_modules,
         unknown_streams,
         unimplemented_streams,
-    })
+        exploitability: None,
+    };
+
+    // Run exploitability analysis now that we've figured out everything else.
+    exploitability::analyze(&mut process_state, memory_list.as_ref());
+
+    Ok(process_state)
 }
