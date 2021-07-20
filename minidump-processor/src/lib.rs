@@ -7,6 +7,7 @@
 //! [`process_minidump`]: fn.process_minidump.html
 
 mod dwarf_symbolizer;
+mod exploitability;
 mod process_state;
 mod processor;
 mod stackwalker;
